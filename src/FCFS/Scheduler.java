@@ -164,6 +164,12 @@ public class Scheduler {
         }
         double makespan = calcMakespan(list);
         Log.println("Makespan using FCFS: " + makespan);
+        double averageDelay = calculateAverageDelay(list);
+        Log.println("Average delay using FCFS: " + averageDelay);
+        double throughput = calculateThroughput(list);
+        Log.println("Throughput using FCFS: " + throughput);
+        double fairness = calculateFairness(list);
+        Log.println("Fairness using FCFS: " + fairness);
     }
 
     private static double calcMakespan(List<Cloudlet> list) {
@@ -178,4 +184,29 @@ public class Scheduler {
 
         return makespan;
     }
+
+    private static double calculateAverageDelay(List<Cloudlet> tasks) {
+        double totalDelay = 0.0;
+        for (Cloudlet task : tasks) {
+            totalDelay += task.getExecFinishTime() - task.getExecStartTime();
+        }
+        return totalDelay / tasks.size();
+    }
+
+    private static double calculateThroughput(List<Cloudlet> list) {
+        double totalTime = calcMakespan(list);
+        return list.size() / totalTime;
+    }
+
+    private static double calculateFairness(List<Cloudlet> list) {
+        double sum = 0.0, sumSq = 0.0;
+        for (Cloudlet task : list) {
+            double time = task.getActualCPUTime();
+            sum += time;
+            sumSq += time * time;
+        }
+        int n = list.size();
+        return (sum * sum) / (n * sumSq);
+    }
+
 }
