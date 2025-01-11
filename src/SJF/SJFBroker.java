@@ -7,12 +7,8 @@ import org.cloudbus.cloudsim.lists.VmList;
 import java.util.*;
 
 public class SJFBroker extends DatacenterBroker {
-    // Add our own index tracker since we can't access the parent's private guestIndex
-    private int currentVmIndex;
-
     public SJFBroker(String name) throws Exception {
         super(name);
-        currentVmIndex = 0;
     }
 
     @Override
@@ -37,12 +33,17 @@ public class SJFBroker extends DatacenterBroker {
         // Process each cloudlet in sorted order
         List<Cloudlet> successfullySubmitted = new ArrayList<>();
         for (Cloudlet cloudlet : cloudletList) {
-            // Get the VM for the cloudlet, either by guestId or by round-robin index
-            GuestEntity vm = (cloudlet.getGuestId() == -1)
-                    ? getGuestsCreatedList().get(currentVmIndex)
-                    : getVmById(cloudlet.getGuestId());
+            // Get the VM for the cloudlet
+            GuestEntity vm;
+            if (cloudlet.getGuestId() == -1) {
+                // If no specific VM is requested, find the best available VM
+                vm = findBestVmForCloudlet(cloudlet);
+            } else {
+                // If specific VM is requested, use that VM
+                vm = getVmById(cloudlet.getGuestId());
+            }
 
-            // If VM is still not found, skip this cloudlet
+            // If no suitable VM found, skip this cloudlet
             if (vm == null) {
                 logCloudletPostponed(cloudlet);
                 continue;
@@ -59,13 +60,35 @@ public class SJFBroker extends DatacenterBroker {
             cloudletsSubmitted++;
             getCloudletSubmittedList().add(cloudlet);
             successfullySubmitted.add(cloudlet);
-
-            // Update round-robin index
-            currentVmIndex = (currentVmIndex + 1) % getGuestsCreatedList().size();
         }
 
         // Remove submitted cloudlets from the waiting list
         getCloudletList().removeAll(successfullySubmitted);
+    }
+
+    private GuestEntity findBestVmForCloudlet(Cloudlet cloudlet) {
+        GuestEntity bestVm = null;
+        double bestCompletionTime = Double.MAX_VALUE;
+
+        // Find VM that can complete this cloudlet the fastest
+        for (GuestEntity vm : getGuestsCreatedList()) {
+            // Calculate expected completion time based on VM's processing power
+            // and current workload
+            double completionTime = estimateCompletionTime(cloudlet, vm);
+            if (completionTime < bestCompletionTime) {
+                bestCompletionTime = completionTime;
+                bestVm = vm;
+            }
+        }
+
+        return bestVm;
+    }
+
+    private double estimateCompletionTime(Cloudlet cloudlet, GuestEntity vm) {
+        // Simple estimation based on cloudlet length and VM's MIPS
+        // You might want to enhance this with more sophisticated calculations
+        double vmMips = ((Vm)vm).getMips();
+        return cloudlet.getCloudletLength() / vmMips;
     }
 
     private GuestEntity getVmById(int guestId) {
