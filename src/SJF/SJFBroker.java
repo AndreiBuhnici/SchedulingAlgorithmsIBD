@@ -7,8 +7,20 @@ import org.cloudbus.cloudsim.lists.VmList;
 import java.util.*;
 
 public class SJFBroker extends DatacenterBroker {
+    private Map<Integer, Double> vmAvailableTime;
+    private PriorityQueue<GuestEntity> availableVMQueue;
+
     public SJFBroker(String name) throws Exception {
         super(name);
+        vmAvailableTime = new HashMap<>();
+        availableVMQueue = new PriorityQueue<>(Comparator.comparingDouble(vm -> vmAvailableTime.get(vm.getId())));
+    }
+
+    @Override
+    protected void processCloudletReturn(SimEvent ev) {
+        super.processCloudletReturn(ev);
+        Cloudlet cloudlet = (Cloudlet) ev.getData();
+        System.out.println("Cloudlet " + cloudlet.getCloudletId() + " finished execution");
     }
 
     @Override
@@ -21,104 +33,70 @@ public class SJFBroker extends DatacenterBroker {
 
     @Override
     protected void submitCloudlets() {
-        // Validate if there are cloudlets and VMs available
         if (getCloudletList().isEmpty() || getGuestsCreatedList().isEmpty()) {
             return;
         }
 
+        // Initialize VM availability times and populate the priority queue
+        for (GuestEntity vm : getGuestsCreatedList()) {
+            vmAvailableTime.put(vm.getId(), 0.0);
+            availableVMQueue.add(vm); // Add all VMs to the priority queue
+        }
+
         // Sort cloudlets by length (shortest first)
-        List<Cloudlet> cloudletList = new ArrayList<>(getCloudletList());
-        cloudletList.sort(Comparator.comparingLong(Cloudlet::getCloudletLength));
+        List<Cloudlet> sortedCloudlets = new ArrayList<>(getCloudletList());
+        sortedCloudlets.sort(Comparator.comparingLong(Cloudlet::getCloudletLength));
 
-        // Process each cloudlet in sorted order
         List<Cloudlet> successfullySubmitted = new ArrayList<>();
-        for (Cloudlet cloudlet : cloudletList) {
-            // Get the VM for the cloudlet
-            GuestEntity vm;
-            if (cloudlet.getGuestId() == -1) {
-                // If no specific VM is requested, find the best available VM
-                vm = findBestVmForCloudlet(cloudlet);
+        for (Cloudlet cloudlet : sortedCloudlets) {
+            GuestEntity selectedVm = null;
+            double earliestCompletionTime = Double.MAX_VALUE;
+
+            // If VM is specified, use it
+            if (cloudlet.getGuestId() != -1) {
+                selectedVm = getVmById(cloudlet.getGuestId());
+                if (selectedVm != null) {
+                    earliestCompletionTime = calculateCompletionTime(cloudlet, selectedVm);
+                }
             } else {
-                // If specific VM is requested, use that VM
-                vm = getVmById(cloudlet.getGuestId());
+                // Get the VM with the earliest available time from the priority queue
+                while (!availableVMQueue.isEmpty()) {
+                    selectedVm = availableVMQueue.poll();
+                    double completionTime = calculateCompletionTime(cloudlet, selectedVm);
+                    if (completionTime < earliestCompletionTime) {
+                        earliestCompletionTime = completionTime;
+                        break;
+                    }
+                }
             }
 
-            // If no suitable VM found, skip this cloudlet
-            if (vm == null) {
-                logCloudletPostponed(cloudlet);
-                continue;
-            }
+            if (selectedVm == null) continue;
 
-            // Log submission if logging is enabled
-            logCloudletSubmission(cloudlet, vm);
-
-            // Submit the cloudlet to the VM
-            cloudlet.setGuestId(vm.getId());
-            sendNow(getVmsToDatacentersMap().get(vm.getId()),
+            // Submit cloudlet and update VM availability
+            cloudlet.setGuestId(selectedVm.getId());
+            sendNow(getVmsToDatacentersMap().get(selectedVm.getId()),
                     CloudActionTags.CLOUDLET_SUBMIT, cloudlet);
+
+            // Update VM's available time and reinsert into the priority queue
+            vmAvailableTime.put(selectedVm.getId(), earliestCompletionTime);
+            availableVMQueue.add(selectedVm); // Re-insert the VM with updated availability
 
             cloudletsSubmitted++;
             getCloudletSubmittedList().add(cloudlet);
             successfullySubmitted.add(cloudlet);
         }
 
-        // Remove submitted cloudlets from the waiting list
         getCloudletList().removeAll(successfullySubmitted);
     }
 
-    private GuestEntity findBestVmForCloudlet(Cloudlet cloudlet) {
-        GuestEntity bestVm = null;
-        double bestCompletionTime = Double.MAX_VALUE;
-
-        // Find VM that can complete this cloudlet the fastest
-        for (GuestEntity vm : getGuestsCreatedList()) {
-            // Calculate expected completion time based on VM's processing power
-            // and current workload
-            double completionTime = estimateCompletionTime(cloudlet, vm);
-            if (completionTime < bestCompletionTime) {
-                bestCompletionTime = completionTime;
-                bestVm = vm;
-            }
-        }
-
-        return bestVm;
-    }
-
-    private double estimateCompletionTime(Cloudlet cloudlet, GuestEntity vm) {
-        // Simple estimation based on cloudlet length and VM's MIPS
-        // You might want to enhance this with more sophisticated calculations
-        double vmMips = ((Vm)vm).getMips();
-        return cloudlet.getCloudletLength() / vmMips;
+    private double calculateCompletionTime(Cloudlet cloudlet, GuestEntity vm) {
+        double processingTime = cloudlet.getCloudletLength() / ((Vm) vm).getMips();
+        double availableTime = vmAvailableTime.get(vm.getId());
+        return availableTime + processingTime;
     }
 
     private GuestEntity getVmById(int guestId) {
-        // First try to find VM in created list
         GuestEntity vm = VmList.getById(getGuestsCreatedList(), guestId);
-        if (vm == null) {
-            // If not found in created list, try in the main list
-            vm = VmList.getById(getGuestList(), guestId);
-        }
-        return vm;
-    }
-
-    private void logCloudletPostponed(Cloudlet cloudlet) {
-        if (!Log.isDisabled()) {
-            Log.printlnConcat(new Object[]{
-                    CloudSim.clock(), ": ", getName(),
-                    ": Postponing execution of cloudlet ", cloudlet.getCloudletId(),
-                    ": bound guest entity of id ", cloudlet.getGuestId(), " doesn't exist"
-            });
-        }
-    }
-
-    private void logCloudletSubmission(Cloudlet cloudlet, GuestEntity vm) {
-        if (!Log.isDisabled()) {
-            Log.printlnConcat(new Object[]{
-                    CloudSim.clock(), ": ", getName(),
-                    ": Sending ", cloudlet.getClass().getSimpleName(),
-                    " #", cloudlet.getCloudletId(),
-                    " to " + vm.getClassName() + " #", vm.getId()
-            });
-        }
+        return vm != null ? vm : VmList.getById(getGuestList(), guestId);
     }
 }
