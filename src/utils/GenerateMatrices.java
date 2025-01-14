@@ -2,6 +2,7 @@ package utils;
 
 
 import java.io.*;
+import org.apache.commons.math3.distribution.ZipfDistribution;
 
 public class GenerateMatrices {
     private static double[][] commMatrix, execMatrix;
@@ -27,10 +28,17 @@ public class GenerateMatrices {
         BufferedWriter commBufferedWriter = new BufferedWriter(new FileWriter(commFile));
         BufferedWriter execBufferedWriter = new BufferedWriter(new FileWriter(execFile));
 
+        var zipf = new ZipfDistribution(6, 1);
+
         for (int i = 0; i < Constants.NO_OF_TASKS; i++) {
             for (int j = 0; j < Constants.NO_OF_DATA_CENTERS; j++) {
-                commMatrix[i][j] = Math.random() * 600 + 20;
-                execMatrix[i][j] = Math.random() * 500 + 10;
+                if (!Constants.UNBALANCED) {
+                    commMatrix[i][j] = Math.random() * 600 + 20;
+                    execMatrix[i][j] = Math.random() * 500 + 10;
+                } else {
+                    commMatrix[i][j] = (zipf.sample()*100)-50 + Math.random() * 20;
+                    execMatrix[i][j] = (zipf.sample()*100)-50 + Math.random() * 20;
+                }
                 commBufferedWriter.write(String.valueOf(commMatrix[i][j]) + ' ');
                 execBufferedWriter.write(String.valueOf(execMatrix[i][j]) + ' ');
             }
