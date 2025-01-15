@@ -13,11 +13,11 @@ public class GenerateMatrices {
         commMatrix = new double[Constants.NO_OF_TASKS][Constants.NO_OF_DATA_CENTERS];
         execMatrix = new double[Constants.NO_OF_TASKS][Constants.NO_OF_DATA_CENTERS];
         try {
-            if (commFile.exists() && execFile.exists()) {
-                readCostMatrix();
-            } else {
-                initCostMatrix();
-            }
+//            if (commFile.exists() && execFile.exists()) {
+//                readCostMatrix();
+//            } else {
+            initCostMatrix();
+//            }
         } catch (IOException e) {
             e.printStackTrace();
         }
