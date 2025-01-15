@@ -61,12 +61,36 @@ public class Scheduler {
 
             System.out.println("Old init:"+Constants.USE_OLD_MATRIX_INIT);
             System.out.println("Balanced: "+!Constants.UNBALANCED);
-            System.out.println("\""+metrics+"\"");
+            System.out.println(metrics);
+
+            print("{");
+            for (String metric : Arrays.asList("Makespan", "Average_delay", "Throughput", "Fairness")){
+                printQuotes(metric);
+                print(":{");
+                print("\n");
+                for (String alg : algNames) {
+                    printQuotes(alg);
+                    print(":");
+                    System.out.print(metrics.get(alg).get(metric));
+                    print(",");
+                    print("\n");
+                }
+                print("},");
+                print("\n");
+            }
+            print("}");
 
         } catch (Exception e) {
             e.printStackTrace();
             Log.println("The simulation has been terminated due to an unexpected error");
         }
+    }
+
+    private static void printQuotes(String s){
+        System.out.print("\""+s+"\"");
+    }
+    private static void print(String s){
+        System.out.print(s);
     }
 
     private static void initTaskLengths() {
