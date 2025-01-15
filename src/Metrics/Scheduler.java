@@ -64,7 +64,7 @@ public class Scheduler {
             System.out.println(metrics);
 
             print("{");
-            for (String metric : Arrays.asList("Makespan", "Average_delay", "Throughput", "Fairness")){
+            for (String metric : Arrays.asList("Makespan", "Average_delay", "Throughput", "CPU Fairness")){
                 printQuotes(metric);
                 print(":{");
                 print("\n");
@@ -236,7 +236,7 @@ public class Scheduler {
                     Map.entry("Makespan", new ArrayList<Double>()),
                     Map.entry("Average_delay", new ArrayList<Double>()),
                     Map.entry("Throughput", new ArrayList<Double>()),
-                    Map.entry("Fairness", new ArrayList<Double>())
+                    Map.entry("CPU Fairness", new ArrayList<Double>())
             ));
             metrics.put(alg, mets);
         }
@@ -282,13 +282,13 @@ public class Scheduler {
         double throughput = calculateThroughput(list);
         Log.println("Throughput using "+algName+": " + throughput);
         double fairness = calculateFairness(list);
-        Log.println("Fairness using "+algName+": " + fairness);
+        Log.println("CPU Fairness using "+algName+": " + fairness);
 
         var algMetrics = metrics.get(algName);
         algMetrics.get("Makespan").add(makespan);
         algMetrics.get("Average_delay").add(averageDelay);
         algMetrics.get("Throughput").add(throughput);
-        algMetrics.get("Fairness").add(fairness);
+        algMetrics.get("CPU Fairness").add(fairness);
     }
 
     /*

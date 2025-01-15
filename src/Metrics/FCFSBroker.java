@@ -2,6 +2,7 @@ package Metrics;
 
 import org.cloudbus.cloudsim.Cloudlet;
 import org.cloudbus.cloudsim.DatacenterBroker;
+import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.core.SimEvent;
 
 import java.util.Comparator;
@@ -12,12 +13,18 @@ public class FCFSBroker extends DatacenterBroker {
         super(name);
     }
 
-    // Task scheduler
     @Override
     public void submitCloudletList(List<? extends Cloudlet> list) {
-        list.sort(Comparator.comparingDouble(Cloudlet::getSubmissionTime));
+        List<Vm> vmlist = getGuestList();
+        for (int i = 0; i < list.size(); i++) {
+            Cloudlet cloudlet = list.get(i);
+            Vm vm = vmlist.get(i % vmlist.size());
+            cloudlet.setGuestId(vm.getId());
+        }
+
         super.submitCloudletList(list);
     }
+
 
     @Override
     protected void processCloudletReturn(SimEvent ev) {
