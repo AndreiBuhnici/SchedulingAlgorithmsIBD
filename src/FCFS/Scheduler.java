@@ -188,7 +188,7 @@ public class Scheduler {
     private static double calculateAverageDelay(List<Cloudlet> tasks) {
         double totalDelay = 0.0;
         for (Cloudlet task : tasks) {
-            totalDelay += task.getExecFinishTime() - task.getExecStartTime();
+            totalDelay += task.getExecFinishTime() - task.getSubmissionTime();
         }
         return totalDelay / tasks.size();
     }
